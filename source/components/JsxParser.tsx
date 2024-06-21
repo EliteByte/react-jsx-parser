@@ -7,6 +7,7 @@ import { canHaveChildren, canHaveWhitespace } from '../constants/specialTags'
 import { randomHash } from '../helpers/hash'
 import { parseStyle } from '../helpers/parseStyle'
 import { resolvePath } from '../helpers/resolvePath'
+import { ForwardRef } from './ForwardRef'
 
 type ParsedJSX = React.ReactNode | boolean | string
 type ParsedTree = ParsedJSX | ParsedJSX[] | null
@@ -29,15 +30,6 @@ export type TProps = {
 	renderUnrecognized?: (tagName: string) => JSX.Element | null,
 }
 type Scope = Record<string, any>
-
-interface ForwardRefComponentProps {
-    [key: string]: any; // for the rest of the properties
-}
-
-const ForwardRefComponent = React.forwardRef<any, ForwardRefComponentProps>((properties, ref) => {
-	const { component, lowerName, children, ...rest } = properties
-	return React.createElement(component || lowerName, { ...rest, ref }, children)
-})
 
 /* eslint-disable consistent-return */
 export default class JsxParser extends React.Component<TProps> {
@@ -273,7 +265,7 @@ export default class JsxParser extends React.Component<TProps> {
 
 		let children
 		const component = element.type === 'JSXElement'
-			? resolvePath(this.props.components, name)
+			? resolvePath(components, name)
 			: Fragment
 
 		if (component || canHaveChildren(name)) {
@@ -345,24 +337,21 @@ export default class JsxParser extends React.Component<TProps> {
 			children,
 		}
 
-		return React.createElement(ForwardRefComponent, componentProps)
-		// return React.createElement(component || lowerName, props, children)
+		return React.createElement(ForwardRef, componentProps)
 	}
 
 	render() {
 		const jsx = (this.props.jsx || '').trim().replace(/<!DOCTYPE([^>]*)>/g, '')
 		this.ParsedChildren = this.#parseJSX(jsx)
-		const className = [...new Set(['jsx-parser', ...String(this.props.className)
-			.split(' ')])].filter(Boolean).join(' ')
+
+		const classNames = 'jsx-parser'
+		const additionalClassNames : string[] = String(this.props.className).split(' ')
+		const uniqueClassNames: Set<string> = new Set([classNames, ...additionalClassNames])
+		const className = Array.from(uniqueClassNames).filter(Boolean).join(' ')
 
 		return (
 			this.props.renderInWrapper
-				? (
-					<div className={className}>{
-						React.createElement(React.Fragment, {}, this.ParsedChildren)
-					}
-					</div>
-				)
+				? (<div className={className}>{this.ParsedChildren}</div>)
 				: this.ParsedChildren
 		)
 	}
